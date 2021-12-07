@@ -4,92 +4,101 @@ import pygame,sys
 import pygame.locals
 from gameconstant import *
 import random
+from abc import ABC, abstractmethod
 
-pygame.init()
-
-SCREEN=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-pygame.display.set_caption("my game")
-clock=pygame.time.Clock()
-SCREEN.fill(COLOR_BLACK)
-
-backgroundpic=pygame.image.load('./pics/bg.png').convert()
-backgroundpic=pygame.transform.scale2x(backgroundpic)
-floorpic=pygame.image.load('./pics/floor.png').convert()
-floorpic=pygame.transform.scale(floorpic,(1000,100))
-birdpic=pygame.image.load('./pics/bird1.png').convert_alpha()
-birdpic=pygame.transform.scale(birdpic,(56,44))
-pipe_surface=pygame.image.load("./pics/pipe.gif").convert()
-pipe_surface=pygame.transform.scale(pipe_surface,(70,500))
-
-
-SCREEN.blit(backgroundpic,(0,0))
-floorrect=floorpic.get_rect()
-birdrect=birdpic.get_rect()
-birdrect.x=50
-birdrect.y=300
-
-drop_speed=0
-drop_acceleration=0.3
-
-
-floorrect.x=0
-floorrect.y=710
-
-pipe_list=[]
-
+background_surface=None
+clock=None
+SCREEN=None
 ADD_PIPE=pygame.USEREVENT+1
-pygame.time.set_timer(ADD_PIPE,1000)
+game_state_active=True
 
-game_active=True
+class Sprite_Object(ABC,pygame.sprite.Sprite):
+	def __init__(self,image_path:str,start_x:int,start_y:int,scale_x:int=None,scale_y:int=None):
+		if scale_x!=None and scale_y!=None:
+			self.surface=pygame.transform.scale(pygame.image.load(image_path).convert_alpha(),(scale_x,scale_y))
+		else:
+			self.surface=pygame.image.load(image_path).convert_alpha()
+		self.rect=self.surface.get_rect()
+		self.rect.x=start_x
+		self.rect.y=start_y
+	@abstractmethod
+	def move(self):
+		pass
+	def show(self,surface):
+		surface.blit(self.surface,self.rect)
+
+class Floor(Sprite_Object):
+	def __init__(self,image_path):
+		super().__init__(image_path,0,710,1000,100)
+	def move(self):
+		self.rect.move_ip(-SPEED,0)
+
+class Bird(Sprite_Object):
+	def __init__(self,image_path):
+		super().__init__(image_path,50,300,56,44)
+		self.drop_speed=0
+	def move(self):
+		self.rect.move_ip(0,self.drop_speed)
+		self.drop_speed+=DROP_ACCELERATION
+	def fly(self):
+		self.rect.move_ip(0,-50)
+		self.drop_speed=0
+
+class Pipe(Sprite_Object):
+	def __init__(self,image_path,type):
+		height=random.randint(400,650)
+		super().__init__(image_path,500,height,70,500)
+		if type != 'top':
+			self.rect.bottomleft=(500,height-200)
+		self.type=type
+	def move(self):
+		self.rect.move_ip(-SPEED,0)
+	def show(self,surface):
+		if self.type == 'top':
+			super().show(surface)
+		else:
+			surface.blit(pygame.transform.flip(self.surface,False,True),self.rect)
 
 
-while True:
-	for event in pygame.event.get():
-		if event.type == pygame.locals.QUIT:
-			pygame.quit()
-			sys.exit()
-		if event.type == pygame.KEYDOWN:
-			if event.key == pygame.K_SPACE:
-				birdrect.y-=50
-				drop_speed=0
-		if event.type == ADD_PIPE:
-			if game_active:
-				pipe_rect=pipe_surface.get_rect()
-				pipe_rect.x=500
-				pipe_rect.y=random.randint(400,650)
+def game_init():
+	pass
 
-				top_pipe_rect=pipe_surface.get_rect()
-				top_pipe_rect.bottomleft=(500,pipe_rect.y-200)
-				pipe_list.append((pipe_rect,top_pipe_rect))
-			
+if __name__ == "__main__":
+	pygame.init()
+	SCREEN=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
+	pygame.display.set_caption("flappy bird")
+	clock=pygame.time.Clock()
+	SCREEN.fill(COLOR_BLACK)
+	background_surface=pygame.transform.scale2x(pygame.image.load('./pics/bg.png').convert())
+	SCREEN.blit(background_surface,(0,0))
+	pygame.time.set_timer(ADD_PIPE,PIPE_GENERATE_INTERVAL)
 
-	SCREEN.blit(backgroundpic,(0,0))
-	floorrect.move_ip(-SPEED,0)
-
-	if game_active:
-		for pipes in pipe_list:
-			for pipe in pipes:
-				pipe.move_ip(-SPEED,0)
-
-	if floorrect.x < -500:
-		floorrect.x=0
-	birdrect.move_ip(0,drop_speed)
-
-	if game_active:
+	floor=Floor("./pics/floor.png")
+	bird=Bird("./pics/bird1.png")
+	pipe_list=[]
+	while True:
+		for event in pygame.event.get():
+			if event.type == pygame.locals.QUIT:
+				pygame.quit()
+				sys.exit()
+			if event.type == pygame.KEYDOWN:
+				if event.key == pygame.K_SPACE:
+					bird.fly()
+			if event.type == ADD_PIPE:
+				pipe_top=Pipe('./pics/pipe.gif','top')
+				pipe_down=Pipe('./pics/pipe.gif','down')
+				pipe_list.extend([pipe_top,pipe_down])
+		floor.move()
+		if floor.rect.x < -500:
+			floor.rect.x=0
 		for pipe in pipe_list:
-			SCREEN.blit(pipe_surface,pipe[0])
-			SCREEN.blit(pygame.transform.flip(pipe_surface,False,True),pipe[1])
-	if game_active:
-		SCREEN.blit(birdpic,birdrect)
-	SCREEN.blit(floorpic,floorrect)
-
-	pygame.display.update()
-
-	for pipes in pipe_list:
-		for pipe in pipes:
-			if pipe.colliderect(birdrect):
-				pipe_list.clear()
-				game_active=False
-	drop_speed+=drop_acceleration
-	clock.tick(60)
-
+			pipe.move()
+		bird.move()
+		# draw screen
+		SCREEN.blit(background_surface,(0,0))
+		for pipe in pipe_list:
+			pipe.show(SCREEN)
+		bird.show(SCREEN)
+		floor.show(SCREEN)
+		pygame.display.update()
+		clock.tick(60)
