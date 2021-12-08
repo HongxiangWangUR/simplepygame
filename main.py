@@ -13,7 +13,11 @@ ADD_PIPE=pygame.USEREVENT+1
 game_state_active=True
 
 class Sprite_Object(ABC,pygame.sprite.Sprite):
+	'''
+	abstract super class
+	'''
 	def __init__(self,image_path:str,start_x:int,start_y:int,scale_x:int=None,scale_y:int=None):
+		super().__init__()
 		if scale_x!=None and scale_y!=None:
 			self.surface=pygame.transform.scale(pygame.image.load(image_path).convert_alpha(),(scale_x,scale_y))
 		else:
@@ -23,6 +27,9 @@ class Sprite_Object(ABC,pygame.sprite.Sprite):
 		self.rect.y=start_y
 	@abstractmethod
 	def move(self):
+		'''
+		subclass must instantiate this
+		'''
 		pass
 	def show(self,surface):
 		surface.blit(self.surface,self.rect)
@@ -45,23 +52,18 @@ class Bird(Sprite_Object):
 		self.drop_speed=0
 
 class Pipe(Sprite_Object):
-	def __init__(self,image_path,type):
-		height=random.randint(400,650)
+	def __init__(self,image_path,type,height):
 		super().__init__(image_path,500,height,70,500)
-		if type != 'top':
+		if type != 'upward':
 			self.rect.bottomleft=(500,height-200)
 		self.type=type
 	def move(self):
 		self.rect.move_ip(-SPEED,0)
 	def show(self,surface):
-		if self.type == 'top':
+		if self.type == 'upward':
 			super().show(surface)
 		else:
 			surface.blit(pygame.transform.flip(self.surface,False,True),self.rect)
-
-
-def game_init():
-	pass
 
 if __name__ == "__main__":
 	pygame.init()
@@ -76,6 +78,9 @@ if __name__ == "__main__":
 	floor=Floor("./pics/floor.png")
 	bird=Bird("./pics/bird1.png")
 	pipe_list=[]
+
+	obstacle_group=pygame.sprite.Group()
+	# obstacle_group.add(floor)
 	while True:
 		for event in pygame.event.get():
 			if event.type == pygame.locals.QUIT:
@@ -85,9 +90,12 @@ if __name__ == "__main__":
 				if event.key == pygame.K_SPACE:
 					bird.fly()
 			if event.type == ADD_PIPE:
-				pipe_top=Pipe('./pics/pipe.gif','top')
-				pipe_down=Pipe('./pics/pipe.gif','down')
+				height=random.randint(400,650)
+				pipe_top=Pipe('./pics/pipe.gif','upward',height)
+				pipe_down=Pipe('./pics/pipe.gif','downward',height)
 				pipe_list.extend([pipe_top,pipe_down])
+				obstacle_group.add(pipe_top)
+				obstacle_group.add(pipe_down)
 		floor.move()
 		if floor.rect.x < -500:
 			floor.rect.x=0
@@ -101,4 +109,8 @@ if __name__ == "__main__":
 		bird.show(SCREEN)
 		floor.show(SCREEN)
 		pygame.display.update()
+		# collision detection
+		if pygame.sprite.spritecollideany(bird,obstacle_group):
+			print('collision')
+
 		clock.tick(60)
