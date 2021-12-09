@@ -6,11 +6,6 @@ from gameconstant import *
 import random
 from abc import ABC, abstractmethod
 
-background_surface=None
-clock=None
-SCREEN=None
-ADD_PIPE=pygame.USEREVENT+1
-game_state_active=True
 
 class Sprite_Object(ABC,pygame.sprite.Sprite):
 	'''
@@ -65,7 +60,19 @@ class Pipe(Sprite_Object):
 		else:
 			surface.blit(pygame.transform.flip(self.surface,False,True),self.rect)
 
-if __name__ == "__main__":
+def game_init():
+	global SCREEN
+	global background_surface
+	global clock
+	global ADD_PIPE
+	global floor
+
+	# below are variables that will change with game state
+	global bird
+	global pipe_list
+	global game_state_active
+	global obstacle_group
+
 	pygame.init()
 	SCREEN=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
 	pygame.display.set_caption("flappy bird")
@@ -73,44 +80,57 @@ if __name__ == "__main__":
 	SCREEN.fill(COLOR_BLACK)
 	background_surface=pygame.transform.scale2x(pygame.image.load('./pics/bg.png').convert())
 	SCREEN.blit(background_surface,(0,0))
+	ADD_PIPE=pygame.USEREVENT+1
 	pygame.time.set_timer(ADD_PIPE,PIPE_GENERATE_INTERVAL)
-
+	game_state_active=True
 	floor=Floor("./pics/floor.png")
 	bird=Bird("./pics/bird1.png")
 	pipe_list=[]
-
 	obstacle_group=pygame.sprite.Group()
-	# obstacle_group.add(floor)
+	obstacle_group.add(floor)
+
+if __name__ == "__main__":
+	game_init()
 	while True:
 		for event in pygame.event.get():
 			if event.type == pygame.locals.QUIT:
 				pygame.quit()
 				sys.exit()
 			if event.type == pygame.KEYDOWN:
-				if event.key == pygame.K_SPACE:
+				if game_state_active and event.key == pygame.K_SPACE:
 					bird.fly()
 			if event.type == ADD_PIPE:
-				height=random.randint(400,650)
-				pipe_top=Pipe('./pics/pipe.gif','upward',height)
-				pipe_down=Pipe('./pics/pipe.gif','downward',height)
-				pipe_list.extend([pipe_top,pipe_down])
-				obstacle_group.add(pipe_top)
-				obstacle_group.add(pipe_down)
+				if game_state_active:
+					height=random.randint(400,650)
+					pipe_top=Pipe('./pics/pipe.gif','upward',height)
+					pipe_down=Pipe('./pics/pipe.gif','downward',height)
+					pipe_list.extend([pipe_top,pipe_down])
+					obstacle_group.add(pipe_top)
+					obstacle_group.add(pipe_down)
 		floor.move()
 		if floor.rect.x < -500:
 			floor.rect.x=0
-		for pipe in pipe_list:
-			pipe.move()
-		bird.move()
+		if game_state_active:
+			for pipe in pipe_list:
+				pipe.move()
+			bird.move()
 		# draw screen
 		SCREEN.blit(background_surface,(0,0))
 		for pipe in pipe_list:
-			pipe.show(SCREEN)
-		bird.show(SCREEN)
+			if pipe.rect.right<=0:
+				pipe.kill()
+			else:
+				pipe.show(SCREEN)
+		pipe_list=list(filter(lambda x:x.rect.right>0,pipe_list))
+		if game_state_active:
+			bird.show(SCREEN)
 		floor.show(SCREEN)
 		pygame.display.update()
 		# collision detection
 		if pygame.sprite.spritecollideany(bird,obstacle_group):
-			print('collision')
+			for pipe in pipe_list:
+				pipe.kill()
+			game_state_active=False
+			pipe_list.clear()
 
 		clock.tick(60)

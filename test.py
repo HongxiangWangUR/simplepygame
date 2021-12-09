@@ -1,10 +1,8 @@
-import pygame
-from pygame.locals import *
-pygame.init()
+a=None
 
-class person(pygame.sprite.Sprite):
-	def __init__(self):
-		super().__init__()
+def func():
+	global a
+	a=3
 
-group=pygame.sprite.Group()
-group.add(person())
+func()
+print(a)
