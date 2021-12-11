@@ -34,6 +34,8 @@ class Floor(Sprite_Object):
 		super().__init__(image_path,0,710,1000,100)
 	def move(self):
 		self.rect.move_ip(-SPEED,0)
+		if floor.rect.x < -500:
+			floor.rect.x=0
 
 class Bird(Sprite_Object):
 	def __init__(self,image_path):
@@ -66,12 +68,18 @@ def game_init():
 	global clock
 	global ADD_PIPE
 	global floor
+	global game_over_surface
+	global game_over_rect
 
 	# below are variables that will change with game state
 	global bird
 	global pipe_list
 	global game_state_active
 	global obstacle_group
+	global restart_surface
+	global restart_rect
+	global coin_surface
+	global coin_list
 
 	pygame.init()
 	SCREEN=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
@@ -84,10 +92,22 @@ def game_init():
 	pygame.time.set_timer(ADD_PIPE,PIPE_GENERATE_INTERVAL)
 	game_state_active=True
 	floor=Floor("./pics/floor.png")
-	bird=Bird("./pics/bird1.png")
+	bird=Bird("./pics/bird.png")
 	pipe_list=[]
 	obstacle_group=pygame.sprite.Group()
 	obstacle_group.add(floor)
+
+	font=pygame.font.Font(None,50)
+	game_over_surface=font.render("Game Over",False, (255,255,255))
+	game_over_rect=game_over_surface.get_rect()
+	game_over_rect.x=150
+	game_over_rect.y=300
+
+	restart_surface=pygame.transform.scale(pygame.image.load("./pics/restart.png").convert(),(100,50))
+	restart_rect=restart_surface.get_rect(center=(250,400))
+
+	coin_surface=pygame.transform.scale(pygame.image.load("./pics/coin.png").convert(),(50,50))
+	coin_list=[]
 
 if __name__ == "__main__":
 	game_init()
@@ -96,10 +116,10 @@ if __name__ == "__main__":
 			if event.type == pygame.locals.QUIT:
 				pygame.quit()
 				sys.exit()
-			if event.type == pygame.KEYDOWN:
+			elif event.type == pygame.KEYDOWN:
 				if game_state_active and event.key == pygame.K_SPACE:
 					bird.fly()
-			if event.type == ADD_PIPE:
+			elif event.type == ADD_PIPE:
 				if game_state_active:
 					height=random.randint(400,650)
 					pipe_top=Pipe('./pics/pipe.gif','upward',height)
@@ -107,13 +127,24 @@ if __name__ == "__main__":
 					pipe_list.extend([pipe_top,pipe_down])
 					obstacle_group.add(pipe_top)
 					obstacle_group.add(pipe_down)
+
+					coin_rect=coin_surface.get_rect()
+					coin_rect.center=(535,height-100)
+					coin_list.append(coin_rect)
+			elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+				mouse_pos=pygame.mouse.get_pos()
+				if restart_rect.collidepoint(mouse_pos):
+					game_state_active=True
+					bird.rect.x=50
+					bird.rect.y=300
+					bird.drop_speed=0
 		floor.move()
-		if floor.rect.x < -500:
-			floor.rect.x=0
 		if game_state_active:
 			for pipe in pipe_list:
 				pipe.move()
 			bird.move()
+			for coin in coin_list:
+				coin.move_ip(-SPEED,0)
 		# draw screen
 		SCREEN.blit(background_surface,(0,0))
 		for pipe in pipe_list:
@@ -121,16 +152,21 @@ if __name__ == "__main__":
 				pipe.kill()
 			else:
 				pipe.show(SCREEN)
+		for coin in coin_list:
+			SCREEN.blit(coin_surface,coin)
 		pipe_list=list(filter(lambda x:x.rect.right>0,pipe_list))
 		if game_state_active:
 			bird.show(SCREEN)
 		floor.show(SCREEN)
-		pygame.display.update()
 		# collision detection
 		if pygame.sprite.spritecollideany(bird,obstacle_group):
 			for pipe in pipe_list:
 				pipe.kill()
 			game_state_active=False
 			pipe_list.clear()
+		if not game_state_active:
+			SCREEN.blit(restart_surface,restart_rect)
+			SCREEN.blit(game_over_surface,game_over_rect)
 
+		pygame.display.update()
 		clock.tick(60)

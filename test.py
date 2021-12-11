@@ -1,8 +1,5 @@
-a=None
+import pygame
 
-def func():
-	global a
-	a=3
+pygame.init()
 
-func()
-print(a)
+print(pygame.font.get_fonts())
