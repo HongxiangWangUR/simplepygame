@@ -62,6 +62,13 @@ class Pipe(Sprite_Object):
 		else:
 			surface.blit(pygame.transform.flip(self.surface,False,True),self.rect)
 
+class Coin(Sprite_Object):
+	def __init__(self,image_path,pipe_height):
+		super().__init__(image_path,0,0,30,30)
+		self.rect.center=(535,height-100)
+	def move(self):
+		self.rect.move_ip(-SPEED,0)
+
 def game_init():
 	global SCREEN
 	global background_surface
@@ -78,8 +85,12 @@ def game_init():
 	global obstacle_group
 	global restart_surface
 	global restart_rect
-	global coin_surface
 	global coin_list
+	global coin_group
+	global current_score
+	global score_surface
+	global score_rect
+	global score_font
 
 	pygame.init()
 	SCREEN=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
@@ -102,12 +113,20 @@ def game_init():
 	game_over_rect=game_over_surface.get_rect()
 	game_over_rect.x=150
 	game_over_rect.y=300
+	current_score=0
+	score_font=pygame.font.Font(None,40)
+	score_surface=score_font.render("Score: {}".format(current_score),False,(255,255,255))
+	score_rect=score_surface.get_rect(midtop=(250,20))
 
 	restart_surface=pygame.transform.scale(pygame.image.load("./pics/restart.png").convert(),(100,50))
 	restart_rect=restart_surface.get_rect(center=(250,400))
 
-	coin_surface=pygame.transform.scale(pygame.image.load("./pics/coin.png").convert(),(50,50))
+	coin_surface=pygame.transform.scale(pygame.image.load("./pics/coin.png").convert(),(30,30))
 	coin_list=[]
+	coin_group=pygame.sprite.Group()
+
+def filter_out_of_screen_obj(objlist:list):
+	return list(filter(lambda x:x.rect.right>0,objlist))
 
 if __name__ == "__main__":
 	game_init()
@@ -128,9 +147,9 @@ if __name__ == "__main__":
 					obstacle_group.add(pipe_top)
 					obstacle_group.add(pipe_down)
 
-					coin_rect=coin_surface.get_rect()
-					coin_rect.center=(535,height-100)
-					coin_list.append(coin_rect)
+					coin=Coin('./pics/coin.png',height)
+					coin_list.append(coin)
+					coin_group.add(coin)
 			elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 				mouse_pos=pygame.mouse.get_pos()
 				if restart_rect.collidepoint(mouse_pos):
@@ -144,7 +163,7 @@ if __name__ == "__main__":
 				pipe.move()
 			bird.move()
 			for coin in coin_list:
-				coin.move_ip(-SPEED,0)
+				coin.move()
 		# draw screen
 		SCREEN.blit(background_surface,(0,0))
 		for pipe in pipe_list:
@@ -153,20 +172,35 @@ if __name__ == "__main__":
 			else:
 				pipe.show(SCREEN)
 		for coin in coin_list:
-			SCREEN.blit(coin_surface,coin)
-		pipe_list=list(filter(lambda x:x.rect.right>0,pipe_list))
+			if coin.rect.right<=0:
+				coin.kill()
+			else:
+				coin.show(SCREEN)
+		pipe_list=filter_out_of_screen_obj(pipe_list)
+		coin_list=filter_out_of_screen_obj(coin_list)
 		if game_state_active:
 			bird.show(SCREEN)
-		floor.show(SCREEN)
 		# collision detection
 		if pygame.sprite.spritecollideany(bird,obstacle_group):
-			for pipe in pipe_list:
-				pipe.kill()
-			game_state_active=False
+			pygame.sprite.Group.empty(obstacle_group)
+			obstacle_group.add(floor)
 			pipe_list.clear()
+			pygame.sprite.Group.empty(coin_group)
+			coin_list.clear()
+			game_state_active=False
+
+		if pygame.sprite.spritecollideany(bird,coin_group):
+			collide_coin_list=pygame.sprite.spritecollide(bird,coin_group,True)
+			current_score+=1
+			coin_list=list(filter(lambda x:x not in collide_coin_list,coin_list))
 		if not game_state_active:
 			SCREEN.blit(restart_surface,restart_rect)
 			SCREEN.blit(game_over_surface,game_over_rect)
+			current_score=0
+		else:
+			score_surface=score_font.render("Score: {}".format(current_score),False,(255,255,255))
+			SCREEN.blit(score_surface,score_rect)
 
+		floor.show(SCREEN)
 		pygame.display.update()
 		clock.tick(60)
