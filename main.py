@@ -38,14 +38,27 @@ class Floor(Sprite_Object):
 			floor.rect.x=0
 
 class Bird(Sprite_Object):
-	def __init__(self,image_path):
-		super().__init__(image_path,50,300,56,44)
+	def __init__(self,image_path,surface):
+		if surface is None:
+			super().__init__(image_path,50,300,56,44)
+		else:
+			self.surface=surface
+			self.rect=self.surface.get_rect()
+			self.rect.x=50
+			self.rect.y=300
 		self.drop_speed=0
 	def move(self):
 		self.rect.move_ip(0,self.drop_speed)
 		self.drop_speed+=DROP_ACCELERATION
 	def fly(self):
 		self.rect.move_ip(0,-50)
+		self.drop_speed=0
+	def show(self,surface):
+		rotate_surface=pygame.transform.rotozoom(self.surface,-self.drop_speed*0.8,1)
+		surface.blit(rotate_surface,self.rect)
+	def position_restore(self):
+		self.rect.x=50
+		self.rect.y=300
 		self.drop_speed=0
 
 class Pipe(Sprite_Object):
@@ -77,6 +90,9 @@ def game_init():
 	global floor
 	global game_over_surface
 	global game_over_rect
+	global fly_sound
+	global hit_sound
+	global score_sound
 
 	# below are variables that will change with game state
 	global bird
@@ -91,7 +107,9 @@ def game_init():
 	global score_surface
 	global score_rect
 	global score_font
+	global coin_surface
 
+	pygame.mixer.pre_init()
 	pygame.init()
 	SCREEN=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
 	pygame.display.set_caption("flappy bird")
@@ -103,10 +121,13 @@ def game_init():
 	pygame.time.set_timer(ADD_PIPE,PIPE_GENERATE_INTERVAL)
 	game_state_active=True
 	floor=Floor("./pics/floor.png")
-	bird=Bird("./pics/bird.png")
+	bird=Bird("./pics/bird.png",None)
 	pipe_list=[]
 	obstacle_group=pygame.sprite.Group()
 	obstacle_group.add(floor)
+	fly_sound=pygame.mixer.Sound('./sound/wing.wav')
+	hit_sound=pygame.mixer.Sound('./sound/hit.wav')
+	score_sound=pygame.mixer.Sound('./sound/score.wav')
 
 	font=pygame.font.Font(None,50)
 	game_over_surface=font.render("Game Over",False, (255,255,255))
@@ -138,6 +159,7 @@ if __name__ == "__main__":
 			elif event.type == pygame.KEYDOWN:
 				if game_state_active and event.key == pygame.K_SPACE:
 					bird.fly()
+					fly_sound.play()
 			elif event.type == ADD_PIPE:
 				if game_state_active:
 					height=random.randint(400,650)
@@ -154,9 +176,7 @@ if __name__ == "__main__":
 				mouse_pos=pygame.mouse.get_pos()
 				if restart_rect.collidepoint(mouse_pos):
 					game_state_active=True
-					bird.rect.x=50
-					bird.rect.y=300
-					bird.drop_speed=0
+					bird.position_restore()
 		floor.move()
 		if game_state_active:
 			for pipe in pipe_list:
@@ -188,11 +208,14 @@ if __name__ == "__main__":
 			pygame.sprite.Group.empty(coin_group)
 			coin_list.clear()
 			game_state_active=False
+			bird.position_restore()
+			hit_sound.play()
 
 		if pygame.sprite.spritecollideany(bird,coin_group):
 			collide_coin_list=pygame.sprite.spritecollide(bird,coin_group,True)
 			current_score+=1
 			coin_list=list(filter(lambda x:x not in collide_coin_list,coin_list))
+			score_sound.play()
 		if not game_state_active:
 			SCREEN.blit(restart_surface,restart_rect)
 			SCREEN.blit(game_over_surface,game_over_rect)
