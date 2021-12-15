@@ -112,23 +112,29 @@ def game_init():
 	global score_rect
 	global score_font
 	global coin_surface
+	global welcome_surface
+	global game_state_init
+	global welcome_rect
+
 
 	pygame.mixer.pre_init()
 	pygame.init()
 	SCREEN=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-	pygame.display.set_caption("flappy bird")
+	pygame.display.set_caption("flappy dog")
 	clock=pygame.time.Clock()
 	SCREEN.fill(COLOR_BLACK)
 	background_surface=pygame.transform.scale2x(pygame.image.load('./pics/bg.png').convert())
 	SCREEN.blit(background_surface,(0,0))
 	ADD_PIPE=pygame.USEREVENT+1
 	pygame.time.set_timer(ADD_PIPE,PIPE_GENERATE_INTERVAL)
-	game_state_active=True
+	game_state_active=False
+	game_state_init=True
 	# pre load image surface
 	floor_surface=load_surface("./pics/floor.png",1000,100)
-	bird_surface=load_surface("./pics/bird.png",56,44)
+	bird_surface=load_surface("./pics/dog.png",56,44)
 	pipe_surface=load_surface('./pics/pipe.gif',70,500)
 	coin_surface=load_surface("./pics/coin.png",30,30)
+	welcome_surface=pygame.transform.scale(pygame.image.load("./pics/welcome.png").convert_alpha(),(367,97))
 
 	floor=Floor(floor_surface)
 	bird=Bird(bird_surface)
@@ -138,18 +144,18 @@ def game_init():
 	hit_sound=pygame.mixer.Sound('./sound/hit.wav')
 	score_sound=pygame.mixer.Sound('./sound/score.wav')
 
-	font=pygame.font.Font(None,50)
-	game_over_surface=font.render("Game Over",False, (255,255,255))
-	game_over_rect=game_over_surface.get_rect()
-	game_over_rect.x=150
-	game_over_rect.y=300
+	# font=pygame.font.Font(None,50)
+	# game_over_surface=font.render("Game Over",False, (255,255,255))
+	game_over_surface=pygame.transform.scale(pygame.image.load("./pics/gameover.png").convert_alpha(),(309,85))
+	game_over_rect=game_over_surface.get_rect(center=(250,300))
 	current_score=0
 	score_font=pygame.font.Font(None,40)
 	score_surface=score_font.render("Score: {}".format(current_score),False,(255,255,255))
 	score_rect=score_surface.get_rect(midtop=(250,20))
 
 	restart_surface=pygame.transform.scale(pygame.image.load("./pics/restart.png").convert(),(100,50))
-	restart_rect=restart_surface.get_rect(center=(250,400))
+	restart_rect=restart_surface.get_rect(center=(250,450))
+	welcome_rect=welcome_surface.get_rect(center=(250,300))
 
 	coin_group=pygame.sprite.Group()
 
@@ -174,10 +180,11 @@ if __name__ == "__main__":
 
 					coin=Coin(coin_surface,height)
 					coin_group.add(coin)
-			elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+			elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not game_state_active:
 				mouse_pos=pygame.mouse.get_pos()
 				if restart_rect.collidepoint(mouse_pos):
 					game_state_active=True
+					game_state_init=False
 					bird.position_restore()
 		# move all objects position
 		floor.move()
@@ -217,7 +224,10 @@ if __name__ == "__main__":
 			score_sound.play()
 		if not game_state_active:
 			SCREEN.blit(restart_surface,restart_rect)
-			SCREEN.blit(game_over_surface,game_over_rect)
+			if game_state_init:
+				SCREEN.blit(welcome_surface,welcome_rect)
+			else:
+				SCREEN.blit(game_over_surface,game_over_rect)
 			current_score=0
 		else:
 			score_surface=score_font.render("Score: {}".format(current_score),False,(255,255,255))
