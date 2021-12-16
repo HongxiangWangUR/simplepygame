@@ -5,6 +5,8 @@ import pygame.locals
 from gameconstant import *
 import random
 from abc import ABC, abstractmethod
+from os import path
+import json
 
 def load_surface(image_path:str,scale_x:int=None,scale_y:int=None):
 	if scale_x is not None and scale_y is not None:
@@ -115,6 +117,12 @@ def game_init():
 	global welcome_surface
 	global game_state_init
 	global welcome_rect
+	global rank_surface
+	global rank_rect
+	global rank_data
+	global score_board_flag
+	global score_board_surface
+	global score_board_rect
 
 
 	pygame.mixer.pre_init()
@@ -129,6 +137,7 @@ def game_init():
 	pygame.time.set_timer(ADD_PIPE,PIPE_GENERATE_INTERVAL)
 	game_state_active=False
 	game_state_init=True
+	score_board_flag=False
 	# pre load image surface
 	floor_surface=load_surface("./pics/floor.png",1000,100)
 	bird_surface=load_surface("./pics/dog.png",56,44)
@@ -144,8 +153,6 @@ def game_init():
 	hit_sound=pygame.mixer.Sound('./sound/hit.wav')
 	score_sound=pygame.mixer.Sound('./sound/score.wav')
 
-	# font=pygame.font.Font(None,50)
-	# game_over_surface=font.render("Game Over",False, (255,255,255))
 	game_over_surface=pygame.transform.scale(pygame.image.load("./pics/gameover.png").convert_alpha(),(309,85))
 	game_over_rect=game_over_surface.get_rect(center=(250,300))
 	current_score=0
@@ -153,17 +160,35 @@ def game_init():
 	score_surface=score_font.render("Score: {}".format(current_score),False,(255,255,255))
 	score_rect=score_surface.get_rect(midtop=(250,20))
 
-	restart_surface=pygame.transform.scale(pygame.image.load("./pics/restart.png").convert(),(100,50))
-	restart_rect=restart_surface.get_rect(center=(250,450))
+	restart_surface=pygame.transform.scale(pygame.image.load("./pics/restart.png").convert(),(100,60))
+	restart_rect=restart_surface.get_rect(center=(150,450))
 	welcome_rect=welcome_surface.get_rect(center=(250,300))
 
 	coin_group=pygame.sprite.Group()
+	rank_surface=pygame.transform.scale(pygame.image.load('./pics/rank.png').convert_alpha(),(100,60))
+	rank_rect=rank_surface.get_rect(center=(350,450))
+
+	score_board_surface=pygame.transform.scale(pygame.image.load('./pics/scoreboard.png').convert_alpha(),(370,180))
+	score_board_rect=score_board_surface.get_rect(center=(250,300))
+
+	if path.exists('rank.json'):
+		try:
+			with open('rank.json') as rank_file:
+				scores=rank_file.read()
+				rank_data=json.loads(scores)
+		except Exception:
+			print('parse rank.json error, rank data will be initialized in default')
+			rank_data=[]
+	else:
+		rank_data=[]
 
 if __name__ == "__main__":
 	game_init()
 	while True:
 		for event in pygame.event.get():
 			if event.type == pygame.locals.QUIT:
+				with open('rank.json','w') as rank_file:
+					json.dump(rank_data,rank_file)
 				pygame.quit()
 				sys.exit()
 			elif event.type == pygame.KEYDOWN:
@@ -185,7 +210,11 @@ if __name__ == "__main__":
 				if restart_rect.collidepoint(mouse_pos):
 					game_state_active=True
 					game_state_init=False
-					bird.position_restore()
+					score_board_flag=False
+					current_score=0
+				elif rank_rect.collidepoint(mouse_pos):
+					score_board_flag=True
+					game_state_active=False
 		# move all objects position
 		floor.move()
 		if game_state_active:
@@ -201,13 +230,11 @@ if __name__ == "__main__":
 				coin.move()
 				if coin.rect.right<=0:
 					coin.kill()
-		# draw object
+		# draw objects
 		SCREEN.blit(background_surface,(0,0))
 		if game_state_active:
 			obstacle_group.draw(SCREEN)
 			coin_group.draw(SCREEN)
-		
-		if game_state_active:
 			bird.show(SCREEN)
 		# collision detection
 		if pygame.sprite.spritecollideany(bird,obstacle_group):
@@ -216,6 +243,10 @@ if __name__ == "__main__":
 			pygame.sprite.Group.empty(coin_group)
 			game_state_active=False
 			bird.position_restore()
+			rank_data.append(current_score)
+			rank_data.sort()
+			if len(rank_data)>SCORE_BOARD_LIMIT:
+				rank_data.pop(0)
 			hit_sound.play()
 
 		if pygame.sprite.spritecollideany(bird,coin_group):
@@ -223,12 +254,27 @@ if __name__ == "__main__":
 			current_score+=1
 			score_sound.play()
 		if not game_state_active:
-			SCREEN.blit(restart_surface,restart_rect)
-			if game_state_init:
-				SCREEN.blit(welcome_surface,welcome_rect)
+			if score_board_flag:
+				SCREEN.blit(score_board_surface,score_board_rect)
+				SCREEN.blit(restart_surface,restart_rect)
+				#draw current score
+				current_surface=score_font.render(" {} ".format(current_score),False,(255,255,255))
+				current_rect=current_surface.get_rect(center=(360,280))
+				SCREEN.blit(current_surface,current_rect)
+				#draw best score
+				best_score=current_score
+				if rank_data is not None and len(rank_data)>0:
+					best_score=max(rank_data)
+					best_surface=score_font.render(' {} '.format(best_score),False,(255,255,255))
+					best_rect=best_surface.get_rect(center=(360,340))
+					SCREEN.blit(best_surface,best_rect)
 			else:
-				SCREEN.blit(game_over_surface,game_over_rect)
-			current_score=0
+				SCREEN.blit(restart_surface,restart_rect)
+				SCREEN.blit(rank_surface,rank_rect)
+				if game_state_init:
+					SCREEN.blit(welcome_surface,welcome_rect)
+				else:
+					SCREEN.blit(game_over_surface,game_over_rect)
 		else:
 			score_surface=score_font.render("Score: {}".format(current_score),False,(255,255,255))
 			SCREEN.blit(score_surface,score_rect)

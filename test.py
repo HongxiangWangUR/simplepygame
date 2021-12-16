@@ -1,5 +1,7 @@
-import pygame
+# import os.path
+from os import path
 
-pygame.init()
+print(path.exists('rank.json'))
+print(path.exists('test.py'))
 
-print(pygame.font.get_fonts())
+print(max([1,2,3]))
