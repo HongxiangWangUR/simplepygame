@@ -1,4 +1,4 @@
-pics/
+# pics/
 **/__pycache__/
-sound/
+# sound/
 rank.json
